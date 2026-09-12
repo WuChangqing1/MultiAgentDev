@@ -51,6 +51,7 @@ Telemetry    →  前端 / 数据库 / 日志        （永不进入 Prompt）
 | 文档 | 内容 |
 | --- | --- |
 | **[docs/STARTUP.md](docs/STARTUP.md)** | **API Key 写在哪 · 重启后怎么启动 · 怎么确认一切正常** |
+| **[docs/DEVELOPING.md](docs/DEVELOPING.md)** | **怎么开发新的多 Agent（6 步，含真实示例 `LocalCoderAgent`）** |
 | [docs/FIXES.md](docs/FIXES.md) | 开发中实测发现的 7 个缺陷：根因、修复位置、回归测试 |
 | [docs/LIMITATIONS.md](docs/LIMITATIONS.md) | 6 个已知限制的逐条优化方案与判断标准 |
 

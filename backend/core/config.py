@@ -100,6 +100,7 @@ class Settings(BaseSettings):
     reasoning_summarizer: str = "low"
     reasoning_classifier: str = "none"
     reasoning_reviewer: str = "medium"
+    reasoning_coder: str = "low"
     reasoning_main: str = "medium"
 
     # ---- Feature flags ----------------------------------------------------
@@ -123,12 +124,19 @@ class Settings(BaseSettings):
         return bool(self.deepseek_api_key.strip())
 
     def reasoning_for(self, agent_key: str) -> str:
+        """Reasoning policy for an agent key.
+
+        Unknown keys get ``"none"`` rather than another agent's policy: a
+        newly added worker should be cheap by default and opt in to more
+        thinking explicitly (see ``docs/DEVELOPING.md``).
+        """
         return {
             "main": self.reasoning_main,
             "local_extractor": self.reasoning_extractor,
             "local_summarizer": self.reasoning_summarizer,
             "local_classifier": self.reasoning_classifier,
             "local_reviewer": self.reasoning_reviewer,
+            "local_coder": self.reasoning_coder,
         }.get(agent_key, "none")
 
 
@@ -171,6 +179,7 @@ class RuntimeOverrides(BaseModel):
     reasoning_summarizer: ReasoningEffort | None = None
     reasoning_classifier: ReasoningEffort | None = None
     reasoning_reviewer: ReasoningEffort | None = None
+    reasoning_coder: ReasoningEffort | None = None
 
     enable_local_workers: bool | None = None
     show_reasoning: bool | None = None

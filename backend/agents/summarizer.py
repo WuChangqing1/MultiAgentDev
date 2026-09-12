@@ -9,6 +9,7 @@ class SummarizerAgent(LocalAgent):
     key = "local_summarizer"
     label = "LocalSummarizerAgent"
     role_description = "摘要 / 长文本压缩 / 上下文精简"
+    reasoning_field = "reasoning_summarizer"
     prompt_name = "summarizer"
     output_kind = "text"
 

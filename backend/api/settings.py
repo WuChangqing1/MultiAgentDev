@@ -38,12 +38,13 @@ def _public_view(container: AppContainer) -> dict:
             "temperature": settings.worker_temperature,
             "top_p": settings.worker_top_p,
             "context_window": settings.local_model_context_window,
+            # Derived from the registry, so a newly registered worker shows up in
+            # the Settings panel automatically instead of being silently missing.
             "reasoning": {
-                "local_extractor": settings.reasoning_extractor,
-                "local_summarizer": settings.reasoning_summarizer,
-                "local_classifier": settings.reasoning_classifier,
-                "local_reviewer": settings.reasoning_reviewer,
+                key: settings.reasoning_for(key) for key in container.registry.worker_keys()
             },
+            # agent key -> Settings field name, so the UI never has to guess.
+            "reasoning_fields": container.registry.reasoning_settings_fields(),
         },
         "orchestration": {
             "max_agent_steps": settings.max_agent_steps,

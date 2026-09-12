@@ -69,6 +69,7 @@ class MainAgent(BaseAgent):
     key = _MAIN_AGENT_KEY
     label = "DeepSeek MainAgent"
     role_description = "任务规划 / 委派决策 / 结果校验 / 最终回答"
+    reasoning_field = "reasoning_main"
 
     # -- prompt ------------------------------------------------------------
     def system_prompt(self) -> str:

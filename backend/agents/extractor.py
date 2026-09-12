@@ -9,6 +9,7 @@ class ExtractorAgent(LocalAgent):
     key = "local_extractor"
     label = "LocalExtractorAgent"
     role_description = "信息抽取 / 实体与字段提取 / 文本转 JSON"
+    reasoning_field = "reasoning_extractor"
     prompt_name = "extractor"
     output_kind = "json"
 

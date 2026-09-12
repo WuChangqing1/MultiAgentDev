@@ -23,6 +23,7 @@ export const AGENT_ORDER = [
   'local_summarizer',
   'local_classifier',
   'local_reviewer',
+  'local_coder',
 ] as const
 
 export const AGENT_META: Record<string, AgentMeta> = {
@@ -66,6 +67,14 @@ export const AGENT_META: Record<string, AgentMeta> = {
     isLocal: true,
     role: '格式校验 / 完整性检查 / 一致性核查',
   },
+  local_coder: {
+    key: 'local_coder',
+    label: 'LocalCoderAgent',
+    shortLabel: 'Coder',
+    model: 'MiniCPM5-2B',
+    isLocal: true,
+    role: '小段代码生成 / 代码缺陷检查',
+  },
 }
 
 export function agentMeta(key?: string | null): AgentMeta {
@@ -89,6 +98,7 @@ export const STAGE_LABEL: Record<string, string> = {
   summarizing: 'Summarising content…',
   classifying: 'Classifying input…',
   reviewing: 'Reviewing worker output…',
+  coding: 'Writing code…',
   finalizing: 'Composing the final answer…',
   working: 'Working…',
   done: 'Completed',

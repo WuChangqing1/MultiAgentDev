@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 from agents.base import BaseAgent, WorkerAgent
 from agents.classifier import ClassifierAgent
+from agents.coder import CoderAgent
 from agents.extractor import ExtractorAgent
 from agents.local_agent import LocalAgent
 from agents.main_agent import MainAgent, is_local_agent_key
@@ -80,6 +81,14 @@ class AgentRegistry:
             )
         return out
 
+    def reasoning_settings_fields(self) -> dict[str, str]:
+        """Map agent key -> the Settings field controlling its reasoning policy.
+
+        The Settings UI uses this instead of guessing a field name, so a new
+        agent is configurable without touching the frontend.
+        """
+        return {agent.key: agent.reasoning_field for agent in self._all.values() if agent.reasoning_field}
+
     def reload_workers(self, providers_factory) -> None:
         """Rebuild worker instances after a settings change.
 
@@ -91,8 +100,13 @@ class AgentRegistry:
 
 
 def build_workers(main_agent: MainAgent, local_provider: "LLMProvider") -> dict[str, WorkerAgent]:
-    """Instantiate every local worker on the shared local provider."""
-    classes = (ExtractorAgent, SummarizerAgent, ClassifierAgent, ReviewerAgent)
+    """Instantiate every local worker on the shared local provider.
+
+    Adding an agent is a one-line change here -- that is the whole point of the
+    registry. The `local_` prefix is not cosmetic: `is_local_agent_key` and the
+    router both rely on it to decide whether an agent needs the local endpoint.
+    """
+    classes = (ExtractorAgent, SummarizerAgent, ClassifierAgent, ReviewerAgent, CoderAgent)
     workers: dict[str, WorkerAgent] = {}
     for cls in classes:
         worker = cls(main_agent.settings, local_provider, main_agent.prompts)  # type: ignore[arg-type]

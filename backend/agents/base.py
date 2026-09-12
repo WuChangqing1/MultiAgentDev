@@ -51,6 +51,13 @@ class BaseAgent(abc.ABC):
     label: str = "Agent"
     #: one-line role shown in the Agent panel (user-visible, never prompted)
     role_description: str = ""
+    #: Name of the ``Settings`` / ``RuntimeOverrides`` field holding this
+    #: agent's reasoning policy (e.g. ``reasoning_coder``).
+    #:
+    #: Declared explicitly rather than derived from ``key`` by stripping a
+    #: prefix: derivation happens to work for the current names and then breaks
+    #: silently for the next agent someone adds.
+    reasoning_field: str = ""
 
     def __init__(self, settings: Settings, provider: LLMProvider, prompts: PromptRepository) -> None:
         self._settings = settings

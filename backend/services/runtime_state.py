@@ -25,6 +25,7 @@ AGENT_DISPLAY_ORDER = [
     "local_summarizer",
     "local_classifier",
     "local_reviewer",
+    "local_coder",
 ]
 
 

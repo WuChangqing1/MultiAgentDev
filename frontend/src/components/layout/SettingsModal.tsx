@@ -24,6 +24,8 @@ interface SettingsPayload {
     top_p: number
     context_window: number
     reasoning: Record<string, string>
+    /** agent key -> the Settings field that controls its reasoning policy. */
+    reasoning_fields?: Record<string, string>
   }
   orchestration?: { max_agent_steps: number; enable_local_workers: boolean }
   ui?: { show_reasoning: boolean; debug_mode: boolean }
@@ -219,27 +221,33 @@ export function SettingsModal() {
                     Reasoning policy
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(data.local?.reasoning ?? {}).map(([agent, effort]) => (
-                      <label key={agent} className="flex items-center gap-2 text-xs">
-                        <span className="min-w-0 flex-1 truncate text-ink-soft">{agent}</span>
-                        <select
-                          value={effort}
-                          onChange={(event) =>
-                            patch(
-                              { [`reasoning_${agent.replace('local_', '')}`]: event.target.value },
-                              `${agent} reasoning updated`,
-                            )
-                          }
-                          className="focus-ring rounded border border-hairline bg-surface px-1 py-0.5 font-mono text-2xs text-ink"
-                        >
-                          {['none', 'low', 'medium', 'high'].map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ))}
+                    {Object.entries(data.local?.reasoning ?? {}).map(([agent, effort]) => {
+                      // The backend tells us which settings field controls this
+                      // agent; deriving it from the key would break for any
+                      // agent whose name does not follow the convention.
+                      const field = data.local?.reasoning_fields?.[agent]
+                      return (
+                        <label key={agent} className="flex items-center gap-2 text-xs">
+                          <span className="min-w-0 flex-1 truncate text-ink-soft">{agent}</span>
+                          <select
+                            value={effort}
+                            disabled={!field}
+                            title={field ? `PATCH { ${field}: ... }` : 'no settings field declared'}
+                            onChange={(event) =>
+                              field &&
+                              patch({ [field]: event.target.value }, `${agent} reasoning updated`)
+                            }
+                            className="focus-ring rounded border border-hairline bg-surface px-1 py-0.5 font-mono text-2xs text-ink disabled:opacity-40"
+                          >
+                            {['none', 'low', 'medium', 'high'].map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )
+                    })}
                   </div>
                 </div>
               </Group>

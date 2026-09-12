@@ -1133,6 +1133,7 @@ def _stage_for(agent_key: str) -> str:
         "local_summarizer": "summarizing",
         "local_classifier": "classifying",
         "local_reviewer": "reviewing",
+        "local_coder": "coding",
     }.get(agent_key, "working")
 
 
