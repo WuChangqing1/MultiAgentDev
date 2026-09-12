@@ -1,0 +1,39 @@
+# ============================================================================
+# Multi-Agent Orchestrator — backend dependencies
+#
+# Install into the existing conda environment (do NOT create a new one):
+#
+#   conda activate MultiAgent
+#   python -m pip install -r backend/requirements.txt
+#
+# If PyPI is unreachable, use a mirror:
+#
+#   python -m pip install -r backend/requirements.txt ^
+#       --index-url https://pypi.tuna.tsinghua.edu.cn/simple
+# ============================================================================
+
+# --- Web framework ---------------------------------------------------------
+fastapi>=0.115
+uvicorn[standard]>=0.32
+
+# --- Validation / settings -------------------------------------------------
+pydantic>=2.9
+pydantic-settings>=2.6
+
+# --- Model clients ---------------------------------------------------------
+# One OpenAI-compatible async client is used for BOTH DeepSeek and llama.cpp;
+# the local server is OpenAI-compatible, so no second SDK is needed.
+openai>=1.54
+httpx>=0.27
+
+# --- Persistence -----------------------------------------------------------
+SQLAlchemy>=2.0.36
+aiosqlite>=0.20
+greenlet>=3.1
+
+# --- Utilities -------------------------------------------------------------
+python-dotenv>=1.0
+
+# --- Testing ---------------------------------------------------------------
+pytest>=8.3
+pytest-asyncio>=0.24

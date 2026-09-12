@@ -1,0 +1,233 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Theme tokens
+
+   Light is warm off-white rather than pure white; dark is a desaturated slate
+   rather than pure black. Both keep contrast comfortably above WCAG AA for body
+   text, which matters more here than any stylistic preference.
+   --------------------------------------------------------------------------- */
+
+@layer base {
+  :root {
+    --bg-canvas: 250 250 249;
+    --bg-surface: 255 255 255;
+    --bg-raised: 255 255 255;
+    --bg-sunken: 245 245 244;
+    --border-subtle: 231 229 228;
+    --border-strong: 214 211 209;
+    --text-primary: 28 25 23;
+    --text-secondary: 87 83 78;
+    --text-tertiary: 138 132 126;
+    --accent: 37 99 235;
+    --accent-soft: 219 234 254;
+    --positive: 22 128 91;
+    --caution: 180 108 20;
+    --danger: 200 44 44;
+    --info: 71 85 105;
+    --shadow-color: 28 25 23;
+  }
+
+  .dark {
+    --bg-canvas: 17 18 21;
+    --bg-surface: 24 25 29;
+    --bg-raised: 31 32 37;
+    --bg-sunken: 13 14 17;
+    --border-subtle: 42 44 50;
+    --border-strong: 58 61 69;
+    --text-primary: 237 238 240;
+    --text-secondary: 160 163 170;
+    --text-tertiary: 116 120 128;
+    --accent: 96 149 250;
+    --accent-soft: 30 45 82;
+    --positive: 63 185 132;
+    --caution: 214 158 74;
+    --danger: 232 106 106;
+    --info: 148 163 184;
+    --shadow-color: 0 0 0;
+  }
+
+  * {
+    border-color: rgb(var(--border-subtle));
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: rgb(var(--accent) / 0.24);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Scrollbars — thin and unobtrusive, matching the IDE feel
+   --------------------------------------------------------------------------- */
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--border-strong)) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: rgb(var(--border-strong));
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(var(--text-tertiary) / 0.6);
+    background-clip: content-box;
+  }
+
+  .focus-ring {
+    @apply outline-none ring-offset-0 focus-visible:ring-2 focus-visible:ring-accent/50;
+  }
+
+  /* Skeleton shimmer used while history or timeline data loads. */
+  .skeleton {
+    @apply relative overflow-hidden rounded bg-sunken;
+  }
+
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full animate-shimmer;
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      rgb(var(--border-subtle) / 0.75),
+      transparent
+    );
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Markdown rendering for chat answers
+   --------------------------------------------------------------------------- */
+
+@layer components {
+  .markdown {
+    @apply text-[0.9375rem] leading-relaxed text-ink;
+  }
+
+  .markdown > *:first-child {
+    @apply mt-0;
+  }
+
+  .markdown > *:last-child {
+    @apply mb-0;
+  }
+
+  .markdown p {
+    @apply my-2.5;
+  }
+
+  .markdown h1,
+  .markdown h2,
+  .markdown h3,
+  .markdown h4 {
+    @apply mb-2 mt-5 font-semibold tracking-tight text-ink;
+  }
+
+  .markdown h1 {
+    @apply text-lg;
+  }
+
+  .markdown h2 {
+    @apply text-base;
+  }
+
+  .markdown h3 {
+    @apply text-[0.9375rem];
+  }
+
+  .markdown ul,
+  .markdown ol {
+    @apply my-2.5 space-y-1 pl-5;
+  }
+
+  .markdown ul {
+    @apply list-disc;
+  }
+
+  .markdown ol {
+    @apply list-decimal;
+  }
+
+  .markdown li > p {
+    @apply my-0;
+  }
+
+  .markdown a {
+    @apply text-accent underline decoration-accent/35 underline-offset-2 hover:decoration-accent;
+  }
+
+  .markdown strong {
+    @apply font-semibold text-ink;
+  }
+
+  .markdown blockquote {
+    @apply my-3 border-l-2 border-edge pl-3 text-ink-soft;
+  }
+
+  .markdown hr {
+    @apply my-4 border-hairline;
+  }
+
+  .markdown table {
+    @apply my-3 w-full border-collapse overflow-hidden text-sm;
+  }
+
+  .markdown th,
+  .markdown td {
+    @apply border border-hairline px-2.5 py-1.5 text-left align-top;
+  }
+
+  .markdown th {
+    @apply bg-sunken font-medium text-ink-soft;
+  }
+
+  .markdown code:not(pre code) {
+    @apply rounded border border-hairline bg-sunken px-1 py-0.5 font-mono text-[0.8125rem];
+  }
+
+  .markdown pre {
+    @apply my-3 overflow-x-auto rounded-card border border-hairline bg-sunken p-3;
+  }
+
+  .markdown pre code {
+    @apply font-mono text-[0.8125rem] leading-relaxed;
+    background: transparent !important;
+    padding: 0 !important;
+  }
+
+  /* Compact variant used inside the timeline detail panel. */
+  .markdown-compact {
+    @apply text-[0.8125rem];
+  }
+
+  .markdown-compact p {
+    @apply my-1.5;
+  }
+}
