@@ -37,6 +37,7 @@ class ExecutionStateManager:
         *,
         max_steps: int,
         available_agents: list[str],
+        worker_catalog: dict[str, str] | None = None,
         history_digest: str = "",
     ) -> None:
         self.execution_id = execution_id
@@ -47,6 +48,7 @@ class ExecutionStateManager:
         #: past the budget so a run always ends with an answer.
         self.planning_budget = max_steps
         self.available_agents = list(available_agents)
+        self._worker_catalog = dict(worker_catalog or {})
         self.current_stage = "planning"
         self.step_index = 0
         self._completed: list[str] = []
@@ -62,6 +64,14 @@ class ExecutionStateManager:
 
     def set_local_available(self, available: bool) -> None:
         self._local_available = available
+
+    def set_worker_catalog(self, catalog: dict[str, str]) -> None:
+        """Replace the usable-worker catalogue (key -> one-line role).
+
+        The orchestrator calls this once the local endpoint's health is known, so
+        an offline worker never appears as an option the MainAgent could pick.
+        """
+        self._worker_catalog = dict(catalog)
 
     def set_hint(self, hint: str | None) -> None:
         self._next_hint = (hint or "").strip() or None
@@ -140,6 +150,7 @@ class ExecutionStateManager:
             current_stage=self.current_stage,
             completed_steps=list(self._completed),
             available_agents=list(self.available_agents),
+            available_workers=dict(self._worker_catalog) if self._local_available else {},
             important_results=important,
             errors=list(self._errors),
             next_action_hint=self._next_hint,

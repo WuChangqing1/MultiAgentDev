@@ -89,6 +89,20 @@ class AgentRegistry:
         """
         return {agent.key: agent.reasoning_field for agent in self._all.values() if agent.reasoning_field}
 
+    def worker_catalog(self, *, local_available: bool) -> dict[str, str]:
+        """Usable workers as ``key -> "Label — role"``, for the prompt tail.
+
+        This is what makes delegation automatic: the MainAgent is told what it can
+        delegate to at request time, so registering a new agent is sufficient --
+        no prompt edit required, and an offline worker is never offered.
+        """
+        if not local_available:
+            return {}
+        return {
+            key: f"{worker.label} — {worker.role_description}"
+            for key, worker in self._workers.items()
+        }
+
     def reload_workers(self, providers_factory) -> None:
         """Rebuild worker instances after a settings change.
 

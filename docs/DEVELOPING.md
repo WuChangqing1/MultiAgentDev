@@ -222,36 +222,93 @@ local_coder      LocalCoderAgent      MiniCPM5-2B       True low                
 
 ## 3. 怎么让 MainAgent 真的用它
 
-**这一步不需要改代码。** MainAgent 的决策来自 Prompt 里的 `available_agents`，
-而它由 registry 自动注入。你只要在 `_static_prefix.md` 的 Worker 表格里加一行说明，
-MainAgent 就知道该在什么时候用它：
+**这一步不需要改代码。** 你只要在步骤 3 把它注册进 registry，它的名字和职责就会
+**自动出现在每次请求的 Prompt 里** —— 这一节解释这个机制，以及为什么它有时仍然不用。
 
-```markdown
-| key | job |
-| --- | --- |
-| `local_extractor` | pull fields/entities out of text, emit structured data |
-| `local_summarizer` | compress long text, keep key facts |
-| `local_classifier` | labels, intent, task-type |
-| `local_reviewer` | format/completeness/consistency check |
-| `local_coder` | write one small self-contained function, or review a snippet |
-```
+### 机制：动态 Worker 目录
 
-**注意**：`_static_prefix.md` 是**可缓存的静态前缀**（标着 `CACHE_PREFIX_V1`），
-改它会让 provider 的 prompt cache 失效一次。这是可接受的（改 Prompt 本来就该重新缓存），
-但**不要在每次请求里动态改它** —— 那会让缓存永远不命中。
-
-测试怎么确认 MainAgent 会委派？直接问它：
+`_static_prefix.md`(静态前缀）里**故意不再列 Worker 清单**。清单由 registry 在每次请求时
+生成，注入到 Prompt 最末尾：
 
 ```
-写一个 Python 函数，判断字符串是否为回文。只给代码。
+===== INTERNAL AGENT STATE =====
+user_goal: 从下面 6 条设备巡检记录里抽取...
+available_agents: main, local_extractor, local_summarizer, local_classifier, local_reviewer, local_coder
+local_workers_available: true
+available_workers (delegate only to these):
+  - local_extractor: LocalExtractorAgent — 信息抽取 / 实体与字段提取 / 文本转 JSON
+  - local_summarizer: LocalSummarizerAgent — 摘要 / 长文本压缩 / 上下文精简
+  - local_classifier: LocalClassifierAgent — 文本分类 / 意图识别 / 任务类型与标签判定
+  - local_reviewer: LocalReviewerAgent — 格式校验 / 完整性检查 / 明显错误与一致性核查
+  - local_coder: LocalCoderAgent — 小段代码生成 / 代码缺陷检查 / 单元测试草稿
+steps_remaining: 12
 ```
 
-预期 Timeline：`MainAgent(planning) → LocalCoderAgent(coding) → MainAgent(reasoning)`。
+为什么这样设计 —— 这是开发时**踩过的真实坑**：
 
-如果 MainAgent 选择自己做，通常是正常的 —— 它判定这个任务自己写更快。
-想更可靠地触发委派，把任务描述得更「机械」一些（明确要求输出格式、强调"只给代码"）。
+> 我加完 `local_coder` 后，它注册了、router 也认，但 MainAgent **从来不用它**。
+> 原因：静态前缀里写死了 4 个 Worker 的表格，MainAgent 从没被告知第 5 个存在。
+> 把清单改成动态生成后，**注册一个新 Agent 就够了，不用碰任何 Prompt**。
+>
+> 现在有测试禁止再写死（`test_static_prefix_no_longer_hardcodes_worker_keys`，
+> 以及 `test_new_agent_reaches_the_prompt_without_editing_prompts`）。
+
+额外好处：**本地模型离线时清单会自动变空**，MainAgent 根本不会尝试委派一个连不上的
+Agent（`worker_catalog(local_available=False)` 返回 `{}`，渲染为
+`available_workers: (none — complete the request yourself)`）。
+
+### 但是：注册 ≠ 一定会被用
+
+MainAgent 会**判断委派是否划算**，这符合它的设计原则（"不要为了调用 Agent 而调用 Agent"）。
+实测同一个系统的四种输入：
+
+| 输入 | 字符数 | 实际行为 | 为什么 |
+| --- | --- | --- | --- |
+| 用 Python 写个回文判断函数，只给代码 | 30 | **自己做** | 3 行代码，委派的往返开销（本地 ~2.6s）比直接写更大 |
+| 6 条巡检记录批量抽取三个字段成 JSON | 422 | **委派给 local_extractor** | 重复的机械劳动，MainAgent 的理由是"机械式字段抽取，6 条记录结构一致，适合本地抽取器" |
+| 证明 n³−n 能被 6 整除 | 28 | **自己做** | 2B 模型做不了多步证明 |
+| 概括我们刚才聊的 + 判断我下一步该做什么 | 35 | **自己做** | Worker 看不到对话历史，也没有判断力 |
+
+**结论：多 Agent 不是固定流水线。** 委派只在"机械、自包含、可校验、且省 Token"时才发生。
+短任务不被委派是**正确行为**，不是 bug。
+
+想让某个任务稳定地被委派，把它写得**更像 Worker 的活**：
+
+```
+❌ 帮我处理一下这些数据
+❌ 解释一下这段代码
+✅ 从下面 20 条记录里抽取 A、B、C 三个字段，输出 JSON 数组，每条记录一个对象
+✅ 把这 3000 字压缩成 3 句话，保留所有人名和数字
+✅ 判断下面这段文本属于"投诉 / 咨询 / 表扬"中的哪一类
+```
+
+### 自己验证调度
+
+本仓库带了一个可直接运行的调度演示：
+
+```powershell
+cd backend
+python scripts\demo_routing.py       # 4 种任务，打印实际执行链 + Token
+python scripts\inspect_decision.py   # 打印 MainAgent 看到的完整 Prompt 和它的决策理由
+```
+
+`inspect_decision.py` 特别有用：它把注入的 Worker 目录、Prompt 结构、
+以及 MainAgent 自述的 `reason` 全部打出来，是排查"为什么没委派"的最快路径。
 
 ---
+
+## 3.1 如果确认该委派却没委派，按这个顺序查
+
+| 排查项 | 怎么查 | 常见原因 |
+| --- | --- | --- |
+| Agent 注册了吗 | `Invoke-RestMethod http://127.0.0.1:8000/api/agents` | 忘了加进 `build_workers` 的 `classes` |
+| 本地模型在线吗 | `.\scripts\status.ps1` | llama-server 没起，目录自动为空，必然不委派 |
+| 它在 Prompt 里吗 | `python scripts\inspect_decision.py` | `available_workers` 里没有 → 检查 `role_description` 是否为空 |
+| 职责描述清楚吗 | 同上，看目录里的那行文字 | 描述太笼统（"处理文本"）→ MainAgent 不知道该在何时用 |
+| 任务本身适合委派吗 | 看上面的对照表 | 任务太短/需要推理/需要历史 → **不委派是正确行为** |
+| 被路由拦下了吗 | 开 Debug Mode 看时间线的 `decision` 事件 | `no budget left` / `worker offline` 会记在 Agent State 的 `errors` 里 |
+
+
 
 ## 4. 其他扩展点
 

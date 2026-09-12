@@ -17,14 +17,12 @@ The workers are **prompt-and-configuration variants of one loaded model**. They
 share `http://127.0.0.1:8080/v1`; selecting a worker selects a system prompt,
 a task and a reasoning policy. There is no second copy of the model.
 
-Local workers:
-
-| key | job |
-| --- | --- |
-| `local_extractor` | pull fields/entities out of text, emit structured data |
-| `local_summarizer` | compress long text, keep key facts |
-| `local_classifier` | labels, intent, task-type |
-| `local_reviewer` | format/completeness/consistency check on another worker's output |
+**Which workers exist is not listed here on purpose.** The registry can change
+without editing this file, and a stale list would make you delegate to an agent
+that no longer exists — or, worse, fail to use one that does. The authoritative,
+always-current catalogue is given to you at the end of every prompt under
+`available_workers` in the INTERNAL AGENT STATE block. Read it there, and only
+ever name a worker that appears in it.
 
 ## 2. Operating doctrine
 

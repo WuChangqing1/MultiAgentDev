@@ -204,6 +204,11 @@ class Orchestrator:
                 history_digest=digest,
             )
             state.set_local_available(router.local_usable)
+            # Tell the MainAgent what it can actually delegate to right now. This
+            # is what makes "register an agent and it gets used" true.
+            state.set_worker_catalog(
+                self._registry.worker_catalog(local_available=router.local_usable)
+            )
 
             final_answer, status, error = await self._step_loop(
                 execution_id=execution_id,

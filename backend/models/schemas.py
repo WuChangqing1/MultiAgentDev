@@ -49,6 +49,11 @@ class AgentVisibleState(BaseModel):
     current_stage: str = "start"
     completed_steps: list[str] = Field(default_factory=list)
     available_agents: list[str] = Field(default_factory=list)
+    #: key -> one-line role, for every worker that is actually usable right now.
+    #: Rendered as the authoritative catalogue so the MainAgent never has to rely
+    #: on a hardcoded list (which would go stale the moment an agent is added,
+    #: removed, or taken offline).
+    available_workers: dict[str, str] = Field(default_factory=dict)
     important_results: dict[str, str] = Field(default_factory=dict)
     errors: list[str] = Field(default_factory=list)
     next_action_hint: str | None = None
@@ -64,6 +69,14 @@ class AgentVisibleState(BaseModel):
         lines.append(f"current_stage: {self.current_stage}")
         lines.append(f"available_agents: {', '.join(self.available_agents) or '(none)'}")
         lines.append(f"local_workers_available: {str(self.local_workers_available).lower()}")
+
+        if self.available_workers:
+            lines.append("available_workers (delegate only to these):")
+            for key, role in self.available_workers.items():
+                lines.append(f"  - {key}: {role}")
+        else:
+            lines.append("available_workers: (none — complete the request yourself)")
+
         if self.step_index is not None:
             lines.append(f"step_index: {self.step_index}")
         if self.steps_remaining is not None:

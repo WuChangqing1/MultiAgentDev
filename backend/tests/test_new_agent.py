@@ -277,3 +277,93 @@ def test_agent_display_order_covers_every_worker(local_provider):
     workers = build_workers(StubMain(settings_store().effective()), local_provider)  # type: ignore[arg-type]
     missing = set(workers) - set(AGENT_DISPLAY_ORDER)
     assert not missing, f"workers missing from AGENT_DISPLAY_ORDER: {sorted(missing)}"
+
+
+# --------------------------------------------------------------------------
+# Checklist item 7: the MainAgent is TOLD about it (this is what makes
+# delegation automatic rather than requiring a prompt edit)
+# --------------------------------------------------------------------------
+
+
+def test_worker_catalog_describes_every_worker(local_provider):
+    from orchestration.registry import AgentRegistry
+
+    workers = build_workers(StubMain(settings_store().effective()), local_provider)  # type: ignore[arg-type]
+    registry = AgentRegistry(StubMain(settings_store().effective()), workers)  # type: ignore[arg-type]
+
+    catalog = registry.worker_catalog(local_available=True)
+    assert set(catalog) == set(workers)
+    # Each entry must carry the human-readable role, otherwise the MainAgent has
+    # a key with no idea what it is for.
+    assert "Coder" in catalog["local_coder"]
+    assert "代码" in catalog["local_coder"] or "code" in catalog["local_coder"].lower()
+
+
+def test_worker_catalog_is_empty_when_local_model_is_offline(local_provider):
+    """An offline worker must never be offered as a delegation target."""
+    from orchestration.registry import AgentRegistry
+
+    workers = build_workers(StubMain(settings_store().effective()), local_provider)  # type: ignore[arg-type]
+    registry = AgentRegistry(StubMain(settings_store().effective()), workers)  # type: ignore[arg-type]
+    assert registry.worker_catalog(local_available=False) == {}
+
+
+def test_new_agent_reaches_the_prompt_without_editing_prompts(local_provider):
+    """End-to-end proof that registering an agent is sufficient.
+
+    The static prefix deliberately no longer lists workers, so if this passes
+    the catalogue can only have come from the registry.
+    """
+    from orchestration.registry import AgentRegistry
+    from orchestration.state_manager import ExecutionStateManager
+
+    workers = build_workers(StubMain(settings_store().effective()), local_provider)  # type: ignore[arg-type]
+    registry = AgentRegistry(StubMain(settings_store().effective()), workers)  # type: ignore[arg-type]
+
+    state = ExecutionStateManager(
+        "exec-1",
+        "write a palindrome checker",
+        max_steps=12,
+        available_agents=["main", *registry.worker_keys()],
+    )
+    state.set_local_available(True)
+    state.set_worker_catalog(registry.worker_catalog(local_available=True))
+
+    rendered = state.visible_state().render()
+    assert "available_workers" in rendered
+    assert "local_coder" in rendered
+    assert "Coder" in rendered
+
+
+def test_prompt_tail_omits_workers_when_offline(local_provider):
+    from orchestration.registry import AgentRegistry
+    from orchestration.state_manager import ExecutionStateManager
+
+    workers = build_workers(StubMain(settings_store().effective()), local_provider)  # type: ignore[arg-type]
+    registry = AgentRegistry(StubMain(settings_store().effective()), workers)  # type: ignore[arg-type]
+
+    state = ExecutionStateManager("exec-2", "goal", max_steps=6, available_agents=["main"])
+    state.set_local_available(False)
+    state.set_worker_catalog(registry.worker_catalog(local_available=False))
+
+    rendered = state.visible_state().render()
+    assert "available_workers: (none" in rendered
+    assert "local_coder" not in rendered
+
+
+def test_static_prefix_no_longer_hardcodes_worker_keys():
+    """A hardcoded list goes stale the moment an agent is added.
+
+    This is the exact defect that made the freshly added coder agent never get
+    picked: it was registered and routable, but the MainAgent had never been
+    told it existed.
+    """
+    from orchestration.prompt_loader import PromptRepository
+
+    prefix = PromptRepository().main_agent_static_prefix()
+    for key in ("local_extractor", "local_summarizer", "local_classifier", "local_reviewer", "local_coder"):
+        # The key may appear in worked examples, but not as a catalogue row.
+        assert f"| `{key}` |" not in prefix, (
+            f"{key} is listed as a catalogue row in the static prefix; "
+            "the catalogue must come from the registry instead"
+        )
