@@ -46,6 +46,14 @@ Telemetry    →  前端 / 数据库 / 日志        （永不进入 Prompt）
 - [19. 常见问题](#19-常见问题)
 - [20. 已知限制与后续扩展](#20-已知限制与后续扩展)
 
+### 专项文档
+
+| 文档 | 内容 |
+| --- | --- |
+| **[docs/STARTUP.md](docs/STARTUP.md)** | **API Key 写在哪 · 重启后怎么启动 · 怎么确认一切正常** |
+| [docs/FIXES.md](docs/FIXES.md) | 开发中实测发现的 7 个缺陷：根因、修复位置、回归测试 |
+| [docs/LIMITATIONS.md](docs/LIMITATIONS.md) | 6 个已知限制的逐条优化方案与判断标准 |
+
 ---
 
 ## 1. 它是什么
@@ -120,9 +128,9 @@ cd frontend
 npm install
 cd ..
 
-# 4) 配置 .env
+# 4) 配置 .env（填入 DEEPSEEK_API_KEY，这是唯一需要填的地方）
 Copy-Item .env.example .env
-notepad .env          # 填入 DEEPSEEK_API_KEY
+notepad .env
 
 # 5) 确认 llama-server 在 8080 运行（已运行则脚本不会打扰它）
 .\scripts\start_llama_server.ps1
@@ -132,6 +140,10 @@ notepad .env          # 填入 DEEPSEEK_API_KEY
 ```
 
 浏览器打开 **http://127.0.0.1:5173**。
+
+> **系统重启之后**同样是执行第 5、6 步（或只执行 `.\start.ps1`，它会自动探测并提示）。
+> 随时可以用 `.\scripts\status.ps1` 一条命令查看所有组件状态。
+> 详见 **[docs/STARTUP.md](docs/STARTUP.md)**。
 
 > 也可以分两个终端手动启动，见 [第 7 节](#7-启动后端) 与 [第 8 节](#8-启动前端)。
 
@@ -591,20 +603,33 @@ MiniCPM5-2B 的思考预算被吃满时会不产出 `content`。系统已内置�
   多 worker 部署需要引入 Redis 之类的共享层。
 - **SQLite**：适合本地单用户；高并发写会受限于单写者模型。
 - **无鉴权**：仅绑定 `127.0.0.1`，为本地使用设计；开放到局域网前必须加认证。
-- **本地模型串行**：同一时刻只跑一个 MiniCPM 请求（llama-server 单实例），
-  大规模并行需要多实例或 batching。
+- **本地模型：并发已具备，但上下文被切分**。实测你的 llama-server 已经在跑
+  **4 个并行 slot**（`total_slots: 4`），所以并非「串行」；但 `--ctx-size 16384` 是
+  **所有 slot 共享**的，即每个 slot 实际只有约 4096 tokens，而 Worker 的
+  `worker_max_tokens` 就是 2048，余量偏紧。推荐组合：
+  `--ctx-size 65536 --parallel 4 -ctk q8_0 -ctv q8_0`（Q8 KV cache 才能塞进 8GB 显存）。
+  另外 orchestrator 目前是**顺序**调度 worker 的，`AgentDecision.parallel` 字段已预留但未启用。
 - **历史摘要是确定性的截断**，没有调用小模型做归纳（可以接上，但会增加延迟与不可控性）。
 - **前端未做移动端深度优化**：基本可用，但主要面向 1920×1080 / 2560×1440 / 16:10 笔记本。
+  在窄屏下左右两栏会隐藏，导致看不到 Timeline 与 Token。
 
 ### 后续可以扩展
+
+完整方案、代码片段与「什么时候才值得做」的判断标准见
+**[docs/LIMITATIONS.md](docs/LIMITATIONS.md)**。摘要：
 
 - **更多 Worker**：`CodingAgent`、`SearchAgent`、`RAGAgent`、`VisionAgent` —— 实现 `WorkerAgent`
   子类并在 `orchestration/registry.py` 注册即可，其余部分无需改动。
 - **更多 Provider**：`LLMProvider` 接口已经统一（`generate` / `stream` / `health_check`），
   新增 OpenAI / Gemini / Qwen / Ollama 只需加一个文件。
-- **并行委派**：`AgentDecision.parallel` 字段已经预留，可在 orchestrator 中做 `asyncio.gather`。
-- **语义缓存**：静态前缀已经是稳定前缀，可以进一步接 prompt-cache 命中率统计。
-- **Worker 自评闭环**：把 Reviewer 的 verdict 作为路由反馈，让 MainAgent 学会哪些任务不该委派。
+- **并行委派**：`AgentDecision.parallel` 字段已经预留，结合本地 4 个 slot 可在 orchestrator
+  中做 `asyncio.gather`（注意前端 Timeline 需改为按 `step_index` 排序）。
+- **历史摘要模型化**：异步增量摘要 + 按 `(conversation_id, last_message_id)` 缓存 +
+  失败回退到现有确定性截断。
+- **多进程 / 多机**：需要时把事件总线、实时 Token 汇总、运行时状态迁到 Redis；
+  单机自用**不建议**提前引入。
+- **鉴权**：一旦要开放局域网，只需加一个 `API_ACCESS_TOKEN` 依赖 + 前端带 header，
+  见 docs/LIMITATIONS.md 第 3 节的完整实现。
 - **成本分析**：配置价格后已有 `cost_usd` 字段，可做按天/按 Agent 的成本报表。
 
 ---

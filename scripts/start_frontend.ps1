@@ -46,7 +46,7 @@ try {
     $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/api/health' -TimeoutSec 4
     Write-Ok "Backend online (deepseek=$($health.deepseek), minicpm=$($health.minicpm))"
 } catch {
-    Write-Warn "No backend at http://127.0.0.1:8000 — the UI will load but API calls will fail."
+    Write-Warn "No backend at http://127.0.0.1:8000 - the UI will load but API calls will fail."
     Write-Host "    Start it in another terminal:" -ForegroundColor DarkGray
     Write-Host "        .\scripts\start_backend.ps1" -ForegroundColor DarkGray
 }

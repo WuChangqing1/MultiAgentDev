@@ -34,7 +34,7 @@ try {
     Write-Host "    Leaving it untouched. Nothing to do." -ForegroundColor DarkGray
     exit 0
 } catch {
-    Write-Host "    Nothing listening on port $Port — starting a new server." -ForegroundColor DarkGray
+    Write-Host "    Nothing listening on port $Port - starting a new server." -ForegroundColor DarkGray
 }
 
 # --- Validate paths ---------------------------------------------------------

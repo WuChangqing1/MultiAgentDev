@@ -35,7 +35,7 @@ function Write-Head($message) {
     Write-Host "============================================================" -ForegroundColor DarkGray
 }
 
-Write-Head "MultiAgent — DeepSeek MainAgent x local MiniCPM5-2B"
+Write-Head "MultiAgent - DeepSeek MainAgent x local MiniCPM5-2B"
 
 # --- 1. Locate the conda environment ----------------------------------------
 Write-Step "Conda environment '$CondaEnvName'"
@@ -106,7 +106,7 @@ if (-not (Test-Path $envFile)) {
     exit 1
 }
 if (-not (Select-String -Path $envFile -Pattern '^\s*DEEPSEEK_API_KEY\s*=\s*\S+' -Quiet)) {
-    Write-Warn "DEEPSEEK_API_KEY is empty in .env — the MainAgent needs it."
+    Write-Warn "DEEPSEEK_API_KEY is empty in .env - the MainAgent needs it."
     exit 1
 }
 Write-Ok "configured"
@@ -131,7 +131,13 @@ $backendScript = Join-Path $projectRoot 'scripts\start_backend.ps1'
 $frontendScript = Join-Path $projectRoot 'scripts\start_frontend.ps1'
 
 Write-Step "Backend  -> http://127.0.0.1:$BackendPort"
-Start-Process -FilePath 'pwsh' -ArgumentList @(
+
+# Launch each service in its own window using whichever PowerShell host exists.
+# `pwsh` (PowerShell 7+) is preferred when installed, but Windows PowerShell is
+# present on every Windows machine, so falling back keeps this working anywhere.
+$hostExe = if (Get-Command pwsh -ErrorAction SilentlyContinue) { 'pwsh' } else { 'powershell' }
+
+Start-Process -FilePath $hostExe -ArgumentList @(
     '-NoExit', '-File', $backendScript,
     '-Port', $BackendPort, '-CondaEnvName', $CondaEnvName
 ) | Out-Null
@@ -139,7 +145,7 @@ Start-Process -FilePath 'pwsh' -ArgumentList @(
 if (-not $NoFrontend) {
     Start-Sleep -Seconds 3
     Write-Step "Frontend -> http://127.0.0.1:$FrontendPort"
-    Start-Process -FilePath 'pwsh' -ArgumentList @(
+    Start-Process -FilePath $hostExe -ArgumentList @(
         '-NoExit', '-File', $frontendScript, '-Port', $FrontendPort
     ) | Out-Null
 }
@@ -148,6 +154,6 @@ Write-Head "Ready"
 Write-Host "  Open:        http://127.0.0.1:$FrontendPort" -ForegroundColor Green
 Write-Host "  Backend API: http://127.0.0.1:$BackendPort/docs" -ForegroundColor DarkGray
 Write-Host ""
-Write-Host "  Local workers: $(if ($localOk) { 'enabled (MiniCPM online)' } else { 'offline — DeepSeek-only mode' })" -ForegroundColor DarkGray
+Write-Host "  Local workers: $(if ($localOk) { 'enabled (MiniCPM online)' } else { 'offline - DeepSeek-only mode' })" -ForegroundColor DarkGray
 Write-Host "  Each service runs in its own window; close them to stop." -ForegroundColor DarkGray
 Write-Host ""

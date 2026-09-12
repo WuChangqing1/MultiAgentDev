@@ -88,7 +88,7 @@ if (-not (Test-Path $envFile)) {
     exit 1
 }
 if (-not (Select-String -Path $envFile -Pattern '^\s*DEEPSEEK_API_KEY\s*=\s*\S+' -Quiet)) {
-    Write-Warn "DEEPSEEK_API_KEY is empty in .env — the MainAgent cannot run without it."
+    Write-Warn "DEEPSEEK_API_KEY is empty in .env - the MainAgent cannot run without it."
 }
 Write-Ok ".env present"
 
@@ -99,7 +99,7 @@ try {
     $ids = ($models.data | ForEach-Object { $_.id }) -join ', '
     Write-Ok "llama-server is serving: $ids"
 } catch {
-    Write-Warn "No llama-server at http://127.0.0.1:8080 — starting anyway."
+    Write-Warn "No llama-server at http://127.0.0.1:8080 - starting anyway."
     Write-Host "    DeepSeek will handle everything until it is running. Start it with:" -ForegroundColor DarkGray
     Write-Host "        .\scripts\start_llama_server.ps1" -ForegroundColor DarkGray
 }
