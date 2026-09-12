@@ -110,6 +110,10 @@ class DeepSeekProvider(LLMProvider):
         self._client: AsyncOpenAI | None = None
         self._client_signature: tuple[str, str, float] | None = None
         self.last_stream_usage = StreamUsageSlot()
+        #: model name -> whether ``reasoning_effort`` may be sent. Learned by
+        #: probing, because account-specific model names cannot be classified
+        #: from their spelling.
+        self._reasoning_support: dict[str, bool] = {}
 
     # -- lifecycle ---------------------------------------------------------
     @property
@@ -119,6 +123,8 @@ class DeepSeekProvider(LLMProvider):
     def set_model(self, model: str) -> None:
         if model and model != self._model:
             self._model = model
+            # Support is per model; a stale entry would send the wrong control.
+            self._reasoning_support.pop(model, None)
 
     @property
     def configured(self) -> bool:
@@ -193,12 +199,101 @@ class DeepSeekProvider(LLMProvider):
             # this key simply omit usage; nothing breaks.
             kwargs["stream_options"] = {"include_usage": True}
 
-        # Reasoning control is opt-in and only sent to reasoner-style models,
-        # so an unsupported parameter can never fail a normal request.
+        # Reasoning control is opt-in and only sent to models that actually
+        # support it, so an unsupported parameter can never fail a request.
+        #
+        # Detection cannot rely on the model name: accounts expose names like
+        # `deepseek-flash` and `deepseek-v4-pro`, which are reasoning models whose
+        # names contain no "reasoner" substring. A name-only check silently sends
+        # no control at all, which is how this was originally wrong.
         budget = _EFFORT_TO_BUDGET.get(options.reasoning_effort or "none")
-        if budget and "reasoner" in self._model.lower():
+        if budget and self._supports_reasoning_effort():
             kwargs["reasoning_effort"] = _budget_to_effort(budget)
         return kwargs
+
+    def _supports_reasoning_effort(self) -> bool:
+        """Whether ``reasoning_effort`` may be sent to the current model.
+
+        Rules, in order:
+
+        1. A model that reports ``reasoning_tokens`` is thinking natively and
+           needs no parameter -- sending one risks a 400 on some deployments.
+        2. A name containing "reasoner" is the classic opt-in case.
+        3. Otherwise ask the API once, and cache the answer per model.
+        """
+        model = self._model
+        if model in self._reasoning_support:
+            return self._reasoning_support[model]
+        if "reasoner" in model.lower():
+            self._reasoning_support[model] = True
+            return True
+        return False
+
+    async def detect_reasoning_support(self) -> bool:
+        """Probe the API to learn whether this model accepts ``reasoning_effort``.
+
+        Called lazily by the orchestrator/health layer rather than on the request
+        path, so a normal request never pays for a probe. The result is cached
+        per model name and invalidated when the model changes.
+        """
+        model = self._model
+        if model in self._reasoning_support:
+            return self._reasoning_support[model]
+
+        if not self.configured:
+            return False
+
+        # Never probe a model that already reports reasoning tokens: it is a
+        # native reasoning model and must not be sent an effort parameter.
+        try:
+            probe = await self.generate(
+                [LLMMessage(role="user", content="hi")],
+                GenerateOptions(max_tokens=16, temperature=0.0, reasoning_effort="none"),
+            )
+            native = probe.usage.reasoning_tokens is not None or bool(probe.reasoning)
+            if native:
+                self._reasoning_support[model] = False
+                log.info("deepseek_reasoning_native model=%s", model)
+                return False
+        except Exception:  # noqa: BLE001 - a failed probe must not break anything
+            log.debug("deepseek_reasoning_probe_base_failed", exc_info=True)
+            self._reasoning_support[model] = False
+            return False
+
+        # The base call worked and produced no reasoning trace. Try the parameter.
+        supported = False
+        try:
+            client = self._get_client()
+            await client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": "hi"}],
+                max_tokens=16,
+                temperature=0.0,
+                reasoning_effort="low",
+            )
+            supported = True
+        except Exception as exc:  # noqa: BLE001
+            message = str(exc).lower()
+            if any(token in message for token in ("reasoning_effort", "unsupported", "unknown", "invalid")):
+                supported = False
+            else:
+                # A network blip says nothing about parameter support; assume the
+                # parameter is fine and let the real call report any problem.
+                supported = False
+            log.info("deepseek_reasoning_probe model=%s supported=%s", model, supported)
+
+        self._reasoning_support[model] = supported
+        return supported
+
+    @property
+    def reasoning_mode(self) -> str:
+        """Human-readable summary for the UI/health payload."""
+        model = self._model
+        if model in self._reasoning_support:
+            return "effort-controlled" if self._reasoning_support[model] else "model-native"
+        if "reasoner" in model.lower():
+            return "effort-controlled"
+        return "unprobed"
 
     async def _call_with_retry(self, coro_factory):
         """Bounded exponential-backoff retry; never loops forever."""

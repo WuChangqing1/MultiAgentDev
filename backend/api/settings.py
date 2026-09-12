@@ -28,6 +28,9 @@ def _public_view(container: AppContainer) -> dict:
             "max_tokens": settings.main_agent_max_tokens,
             "temperature": settings.main_agent_temperature,
             "reasoning_effort": settings.reasoning_main,
+            # How this model's reasoning is actually controlled, discovered by
+            # probing: "effort-controlled" | "model-native" | "unprobed".
+            "reasoning_mode": container.deepseek.reasoning_mode,
             "price_input": settings.deepseek_price_input,
             "price_output": settings.deepseek_price_output,
         },

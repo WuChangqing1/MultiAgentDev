@@ -166,6 +166,52 @@ LOCAL_MODEL_NAME=MiniCPM5-2B
 MAX_AGENT_STEPS=12
 ```
 
+### DeepSeek 用哪个模型
+
+MainAgent 使用 **`DEEPSEEK_MODEL`**，默认 `deepseek-chat`。
+
+**模型名必须与你的账号实际提供的一致。** 运行这条命令可以看到你的 Key 能访问哪些
+模型、每个模型的行为和开销：
+
+```powershell
+cd backend
+python scripts\check_deepseek_model.py
+```
+
+在开发机上实测的结果（同一个问题、同一次运行）：
+
+| 模型 | 服务端回报 | reasoning | tokens（同一道题） | 延迟 |
+| --- | --- | --- | --- | --- |
+| `deepseek-chat` | `deepseek-chat` | **受 `reasoning_effort` 控制** | prompt 62 / completion 140 | 966 ms |
+| `deepseek-flash` | `deepseek-flash` | 模型自带（发参数会被忽略） | prompt 62 / completion 98 | 944 ms |
+| `deepseek-v4-pro` | `deepseek-v4-pro` | 模型自带 | prompt 115 / completion 121 | 2528 ms |
+
+两个关键点：
+
+1. **`/v1/models` 的列表未必包含所有可用模型名。** 本机上 `deepseek-chat` 能正常调用，
+   但它并不出现在 `/v1/models` 返回的列表里（列表只有 `deepseek-flash` 和
+   `deepseek-v4-pro`）。所以"列表里没有"不等于"不能用"。
+2. **`reasoning_effort` 是否生效必须靠探测，不能靠模型名猜。** 早先的实现用
+   `"reasoner" in model_name` 判断，结果是：账号换成 `deepseek-flash` /
+   `deepseek-v4-pro` 这类名字后，参数**永远不会被发送**，而代码看起来完全正常。
+   现在改为启动后按需探测一次并缓存（见 `providers/deepseek.py` 的
+   `detect_reasoning_support()`），三种情况自动区分：
+
+   | `reasoning_mode` | 含义 | 行为 |
+   | --- | --- | --- |
+   | `effort-controlled` | 思考由参数控制（不发 = 不思考） | 按 `REASONING_MAIN` 发送参数 |
+   | `model-native` | 模型自己就会思考 | **不发**参数，避免 400 |
+   | `unprobed` | 尚未探测 | 不发参数，用模型默认行为 |
+
+**想换模型**：只改 `.env` 的 `DEEPSEEK_MODEL` 并重启后端。不需要改代码，也不需要改
+`DEEPSEEK_REASONER_MODEL`（该配置已删除 —— 它当初被声明和文档化，但代码里从未读取，
+属于会误导人的死配置）。
+
+> ⚠️ **成本影响**：如果 `DEEPSEEK_MODEL` 是 `effort-controlled` 类型且
+> `REASONING_MAIN` 不是 `none`，MainAgent 会真的开始思考，Token 与延迟都会上升
+> （实测同一道题 completion 从 8 涨到 140）。这是**预期行为**，也是 `REASONING_MAIN`
+> 这个配置项本来的用途。想压低成本就设 `REASONING_MAIN=none`。
+
 完整可配置项见 [`.env.example`](.env.example)（每一项都有注释）。
 要点：
 

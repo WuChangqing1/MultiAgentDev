@@ -70,9 +70,13 @@ class Settings(BaseSettings):
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com/v1"
     deepseek_model: str = "deepseek-chat"
-    deepseek_reasoner_model: str = "deepseek-reasoner"
     deepseek_timeout_s: float = 300.0
     deepseek_max_retries: int = 2
+
+    # Whether ``reasoning_effort`` may be sent to the configured model is
+    # discovered at runtime by probing the API (see DeepSeekProvider), not
+    # configured here -- account-specific model names cannot be classified by
+    # spelling, and a wrong guess either loses reasoning control or 400s.
 
     # Optional pricing (USD per 1M tokens). Absent -> cost renders as "N/A".
     deepseek_price_input: float | None = None
